@@ -97,6 +97,11 @@ export class ActionGatewayAdapter extends DirectToolAdapter {
       case "AUTHORITY_HAVING_JURISDICTION": return latitude !== undefined && longitude !== undefined ? { location: { coordinates: [longitude, latitude] }, include_ahj: true } : { address: { addressLines: [address] }, include_ahj: true };
       case "TIMEZONE": return latitude !== undefined && longitude !== undefined ? { locations: [{ id: "installiq", timestamp: Date.now(), geometry: { coordinates: [longitude, latitude] } }] } : {};
       case "PLACES_CONTEXT": return latitude !== undefined && longitude !== undefined ? { preferences: { dataset: "physical-places", maxResults: 5, distance: { value: 0.5, distanceUnit: "MILE" }, autoRoute: true }, location: { addressId: "installiq", country: "USA", latitude, longitude } } : {};
+      case "ROUTE_OR_TRAVEL_TIME": {
+        const r: JsonRecord = { option: "flexible", origin: source.origin, destination: source.destination };
+        if (typeof source.mode === "string") r.mode = source.mode;
+        return r;
+      }
       case "PROPERTY_ATTRIBUTES": return source.preciselyId ? { id: source.preciselyId, query_type: "PRECISELY_ID", fields: ["footprintAreaSquareFootage", "landUseDescription", "yearBuilt", "numberOfBuildingsInParcel", "numberOfStories", "squareFootage"] } : { address, country: "US" };
       case "BUILDING_INFORMATION": return source.preciselyId ? { id: source.preciselyId, query_type: "PRECISELY_ID", fields: ["buildingArea", "buildingID", "buildingType", "elevation", "ubid"] } : { address, country: "US" };
       case "PARCEL_INFORMATION": return source.preciselyId ? { id: source.preciselyId, query_type: "PRECISELY_ID", fields: ["apn", "parcelArea", "parcelID", "elevation"] } : { address, country: "US" };
