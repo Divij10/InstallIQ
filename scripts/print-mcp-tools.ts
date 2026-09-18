@@ -1,0 +1,3 @@
+import { createPreciselyClient } from "../lib/precisely/client";
+async function main(){const client=createPreciselyClient();const health=await client.health();if(!health.connected){console.error(health.message??"MCP unavailable");process.exitCode=1;return;}for(const tool of health.tools??[]){console.log(`${tool.name}${tool.description ? `: ${tool.description.replaceAll("\n"," ")}` : ""}`);console.log(`  input schema: ${JSON.stringify(tool.inputSchema??{})}`);}await client.close();}
+main().catch(error=>{console.error(error instanceof Error?error.message:"Could not list MCP tools");process.exitCode=1});

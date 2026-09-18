@@ -1,0 +1,2 @@
+import type { Evidence } from "@/lib/domain/evidence"; import { EvidenceCard } from "./evidence-card";
+export function RawEvidenceDrawer({evidence}:{evidence:Evidence[]}){return <section className="panel evidence-drawer"><div className="eyebrow">PROVENANCE INSPECTION</div><h3>Evidence & raw data</h3><p className="muted">Each externally sourced fact is normalized before display. Raw tool output remains collapsed and sensitive values are redacted.</p>{evidence.map(x=><EvidenceCard key={x.id} evidence={x}/>)}</section>}

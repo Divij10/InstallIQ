@@ -1,0 +1,2 @@
+import type { AssessmentStatus } from "@/lib/domain/status";
+export function evaluatePolicy(input:{resolved:boolean; outside?:boolean; propertyError?:boolean; jurisdictionError?:boolean}):AssessmentStatus {if(!input.resolved)return "ADDRESS_CORRECTION_REQUIRED";if(input.outside)return "OUTSIDE_SERVICE_AREA";if(input.propertyError||input.jurisdictionError)return "MANUAL_DATA_REVIEW";return "FIELD_SURVEY_REQUIRED";}

@@ -1,0 +1,2 @@
+import type { AssessmentResult } from "@/lib/domain/assessment";
+export function StatusBanner({result}:{result:AssessmentResult}){const label=result.status.replaceAll("_"," ");return <section className={`status ${result.status.toLowerCase()}`} role="status"><div><div className="eyebrow">ASSESSMENT STATUS</div><h2>{label}</h2><p>{result.explanation}</p></div><div className="status-tag">NEXT<br/><strong>{result.nextAction}</strong></div></section>}
