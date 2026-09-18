@@ -22,9 +22,12 @@ export function InstallRequestForm({ onRun, running }: { onRun: (request: Assess
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
   const [suggesting, setSuggesting] = useState(false);
   const submitRef = useRef<HTMLButtonElement>(null);
+  const chosenAddress = useRef<string | undefined>(undefined);
 
   useEffect(() => {
-    if (!addressTouched || form.rawAddress.trim().length < 3) { setSuggestions([]); return; }
+    const query = form.rawAddress.trim();
+    // Re-querying the address the user just picked would reopen the list over the submit button.
+    if (!addressTouched || query.length < 3 || query === chosenAddress.current) { setSuggestions([]); return; }
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       setSuggesting(true);
@@ -39,7 +42,14 @@ export function InstallRequestForm({ onRun, running }: { onRun: (request: Assess
     return () => { window.clearTimeout(timer); controller.abort(); };
   }, [addressTouched, form.rawAddress]);
 
-  const selectAddress = (label: string) => { setForm((current) => ({ ...current, rawAddress: label })); setSuggestions([]); requestAnimationFrame(() => submitRef.current?.focus()); };
+  const selectAddress = (label: string) => {
+    // Focus moves while the suggestion button is still mounted: unmounting the focused
+    // element would drop focus to document.body instead.
+    submitRef.current?.focus();
+    chosenAddress.current = label.trim();
+    setForm((current) => ({ ...current, rawAddress: label }));
+    setSuggestions([]);
+  };
   return <section className="intake-card" aria-label="Start a site assessment">
     <form onSubmit={(event) => { event.preventDefault(); onRun(form); }}>
       <label htmlFor="business">Site or business name</label>

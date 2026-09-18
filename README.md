@@ -21,7 +21,7 @@ flowchart LR
   Suggest --> Client[Precisely client]
   Assessment --> Agent[SiteReadinessAgent]
   Agent --> Address[Verify + geocode]
-  Agent --> Enrichment[Property, tax, AHJ, timezone]
+  Agent --> Enrichment[Property, tax, AHJ, timezone, places]
   Agent --> Area[Precisely traffic-aware route + InstallIQ service policy]
   Agent --> Chargers[AFDC nearby public EV-station inventory]
   Address --> Client
@@ -39,9 +39,40 @@ flowchart LR
 
 The browser never receives Precisely, AFDC, or OpenAI credentials and cannot select arbitrary tools. The server owns the MCP connection and uses an approved action registry. Every hosted call first searches for an action, describes its schema and examples, builds capability-specific arguments, validates them locally, then executes once. AFDC is a separate HTTPS source for public EV-station context. OpenAI is an explanation-only layer: it receives normalized facts, has no tools, cannot change policy, and falls back to deterministic wording on any error.
 
+### Request flow
+
+1. `InstallRequestForm` collects a site name and an installation address. Typing three or more characters debounces a call to `/api/address-suggestions`, which runs `geo_addressing.autocomplete` server-side and returns up to five labels.
+2. `POST /api/assessment` validates the request with Zod, opens one MCP connection, and runs `SiteReadinessAgent`.
+3. The agent runs the optional contact check, then address verification and geocoding. **An unresolved address stops all site-specific enrichment** and returns `ADDRESS_CORRECTION_REQUIRED`.
+4. On resolution, property, jurisdiction, site context, service area, and the AFDC EV-station lookup run concurrently.
+5. A deterministic policy picks the status, a deterministic index scores evidence coverage, and the optional OpenAI brief explains the result. Every skill contributes normalized evidence and trace events that ship with the response.
+
+Assessment statuses are `FIELD_SURVEY_REQUIRED`, `ADDRESS_CORRECTION_REQUIRED`, `MANUAL_DATA_REVIEW`, `OUTSIDE_SERVICE_AREA`, and `SYSTEM_ERROR`.
+
+### Report UI
+
+The result view is a single workspace: a verdict line with the plain-language summary and evidence chips, a Google Maps 3D site canvas that can reframe between the site and the returned charger pins, and four tabs.
+
+| Tab | Shows |
+| --- | --- |
+| Overview | Site-findings table with a per-row source label, the survey plan or next steps, and any data notes |
+| Site record | Accordion over site identity, service area, jurisdiction, and property fields; each row carries its source and reads "Not reported" when the source returned nothing |
+| Public charging | AFDC station table with map-pin numbers, connectors, distance, and last-confirmed date |
+| Source activity | The agent action log and the collapsed raw source responses |
+
 ### Digital Evidence Coverage Index
 
-InstallIQ also calculates a deterministic `0–100` Digital Evidence Coverage Index. It reports how much digital evidence was returned—not whether a site is good, feasible, permitted, serviceable, or approved. The published weights are site identity (30), service-area context (20), property context (20), jurisdiction context (15), and public EV-infrastructure context (15). Missing values earn no points; a routing fallback earns only the distance-evidence portion. OpenAI can explain the result but cannot calculate, modify, or reinterpret the numeric index.
+InstallIQ also calculates a deterministic `0–100` Digital Evidence Coverage Index. It reports how much digital evidence was returned—not whether a site is good, feasible, permitted, serviceable, or approved. Missing values earn no points; a routing fallback earns only the distance-evidence portion. OpenAI can explain the result but cannot calculate, modify, or reinterpret the numeric index.
+
+| Factor | Weight | Earned for |
+| --- | --- | --- |
+| Site identity | 30 | Resolved address (15), standardized address (5), coordinates (5), Precisely ID (5) |
+| Service-area context | 20 | Distance plus an inside/outside result (10), a usable Precisely route (10) |
+| Property context | 20 | Building, parcel, roof, and use/year fields (5 each) |
+| Jurisdiction context | 15 | Tax jurisdiction (5), AHJ (5), timezone (5) |
+| Public EV context | 15 | The AFDC inventory responded; station count does not change the score |
+
+Bands: `Strong` at 80 or above, `Developing` at 50 or above, otherwise `Limited`.
 
 ## Live capabilities
 
@@ -58,31 +89,35 @@ InstallIQ also calculates a deterministic `0–100` Digital Evidence Coverage In
 | Driving route / travel time | `routing.directions` | Service-base and site coordinates |
 | Property, building, parcel, roof context | `property.structure`, `property.buildings`, `property.parcels`, `property.roof_attributes` | Precisely ID returned by address verification |
 
-Every unavailable action is shown as unavailable rather than fabricated. Nearby commercial-place results remain optional and do not establish EV charger inventory.
+Every unavailable action is shown as unavailable rather than fabricated. Nearby commercial-place results remain optional and do not establish EV charger inventory. The contact actions only run when a contact name, email, or phone is supplied; the current form does not collect them, so they normally report "Not supplied".
 
 ## Commands
 
 ```bash
+npm run dev
 npm run lint
 npm run typecheck
-npm test
+npm test                 # Vitest unit suite
+npm run test:e2e         # Playwright, starts the dev server on port 3100
 npm run build
-npm run mcp:verify
-npm run mcp:tools
+npm run mcp:verify       # Connection + capability report
+npm run mcp:tools        # Every discovered MCP tool and its input schema
+npm run mcp:smoke        # One live ADDRESS_VERIFY call
+npm run mcp:catalog      # Semantic action search across InstallIQ's goals
+npm run mcp:inspect -- tax.jurisdiction   # Raw describe output for named action IDs
 npm run mcp:describe -- "validate and standardize a street address"
-npm run mcp:smoke
 ```
 
 ## Configuration
 
-`local` connects to a locally running Precisely MCP server through `PRECISELY_MCP_URL`. `hosted` connects to the Precisely DIS action gateway. `PRECISELY_API_KEY` and `PRECISELY_API_SECRET` remain server-side and must never use a `NEXT_PUBLIC_` prefix.
+`INSTALLIQ_DATA_MODE=hosted` connects to the Precisely DIS action gateway; `local` connects to a locally running Precisely MCP server through `PRECISELY_MCP_URL` and maps its tools by name. `PRECISELY_API_KEY` and `PRECISELY_API_SECRET` remain server-side, are combined into an `Authorization: Apikey <base64(key:secret)>` header, and must never use a `NEXT_PUBLIC_` prefix.
 
 `SERVICE_BASE_LATITUDE`, `SERVICE_BASE_LONGITUDE`, and `SERVICE_RADIUS_MILES` define InstallIQ's own operating area. When Precisely routing returns a result, the policy uses traffic-aware route miles and shows estimated drive time; straight-line Haversine distance remains a visible fallback only. Neither is an electrical-feasibility or permitting decision.
 
-`GOOGLE_MAPS_API_KEY` powers the optional Google Maps 3D site canvas. It is a browser Maps key, so restrict it in Google Cloud by HTTP referrer for `localhost:3000` and your production domain. It must never be used in place of Precisely credentials.
+`GOOGLE_MAPS_API_KEY` powers the Google Maps site canvas, served to the browser through `/api/maps/config`. It is a browser Maps key, so restrict it in Google Cloud by HTTP referrer for `localhost:3000` and your production domain. It must never be used in place of Precisely credentials. Without WebGL2 the canvas falls back to a 2D hybrid map, and without a key it falls back to the address and coordinates.
 
-`NREL_API_KEY` enables the server-side U.S. Alternative Fuels Data Center (AFDC) nearby public EV-station lookup. It is intentionally separate from the Precisely MCP layer. `EV_STATION_SEARCH_RADIUS_MILES` defaults to 5. An empty or failing AFDC integration becomes a visible data limitation; it never downgrades a site or changes the readiness policy.
+`NREL_API_KEY` enables the server-side U.S. Alternative Fuels Data Center (AFDC) nearby public EV-station lookup. It is intentionally separate from the Precisely MCP layer, requests at most twelve public, operational stations, and times out after eight seconds. `EV_STATION_SEARCH_RADIUS_MILES` defaults to 5. An empty or failing AFDC integration becomes a visible data limitation; it never downgrades a site or changes the readiness policy.
 
-`OPENAI_API_KEY` enables the optional structured assessment narrative. It is sent only normalized assessment facts, the deterministic evidence-coverage breakdown, and selected AFDC station records. The model cannot call APIs or MCP tools, and it must not claim electrical capacity, utility approval, permitting, site control, cost, construction feasibility, or live charger availability. It does not calculate or alter the coverage index or assessment policy.
+`OPENAI_API_KEY` enables the optional structured assessment narrative, with the model set by `OPENAI_MODEL` (default `gpt-5`). It is sent only normalized assessment facts, the deterministic evidence-coverage breakdown, and up to three AFDC station records. The model cannot call APIs or MCP tools, and it must not claim electrical capacity, utility approval, permitting, site control, cost, construction feasibility, or live charger availability. It does not calculate or alter the coverage index or assessment policy. Without a key, or on any error, the deterministic rules brief is used instead and the response is labelled `source: "rules"`.
 
-See [the Precisely MCP server review](docs/precisely-mcp-server-review.md) for the server-selection decision and why the hosted Data Integrity Suite gateway remains the single active Precisely integration.
+See [the Precisely MCP server review](docs/precisely-mcp-server-review.md) for the server-selection decision and why the hosted Data Integrity Suite gateway remains the single active Precisely integration, and [docs/limitations.md](docs/limitations.md) for what this prototype deliberately does not do.
