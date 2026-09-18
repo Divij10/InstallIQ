@@ -23,36 +23,75 @@ const narrativeSchema = z.object({
 function rulesBrief(facts: BriefFacts): AssessmentBrief {
   const location = facts.location.standardizedAddress ?? facts.location.submittedAddress;
   const distance = facts.serviceArea?.distanceMiles;
-  const routeLabel = facts.serviceArea?.routeAvailable ? "driving-route miles" : "straight-line miles (fallback)";
-  const area = facts.serviceArea?.inside === true
-    ? `${distance?.toFixed(1) ?? "The"} ${routeLabel} from the service base and inside the configured operating area.`
-    : facts.serviceArea?.inside === false
-      ? `${distance?.toFixed(1) ?? "The"} ${routeLabel} from the service base and outside the configured operating area.`
-      : "Operating-area eligibility could not be calculated.";
   const inventory = facts.evInfrastructure;
   const stationSignal = inventory?.enabled
     ? inventory.stations.length
-      ? `${inventory.stations.length} public EV station${inventory.stations.length === 1 ? "" : "s"} were returned by the US AFDC inventory within ${inventory.searchRadiusMiles} miles.`
-      : `No public EV stations were returned by the US AFDC inventory within ${inventory.searchRadiusMiles} miles.`
-    : "Public EV-station inventory is not configured.";
+      ? `${inventory.stations.length} public EV station${inventory.stations.length === 1 ? "" : "s"} within ${inventory.searchRadiusMiles} miles.`
+      : `No public EV stations within ${inventory.searchRadiusMiles} miles.`
+    : "";
   const nearestStation = inventory?.stations.reduce<number | undefined>((nearest, station) => {
     if (typeof station.distanceMiles !== "number") return nearest;
     return nearest === undefined ? station.distanceMiles : Math.min(nearest, station.distanceMiles);
   }, undefined);
-  const evidenceScore = facts.evidenceScore;
   const limitations = [
     "Electrical capacity, utility capacity, permits, site control, and construction feasibility require a field survey.",
     ...(inventory?.unavailable ? [inventory.message ?? "Public EV-station inventory was unavailable for this run."] : []),
     ...(!facts.serviceArea?.routeAvailable ? ["Precisely route data was not returned, so the service-area decision used straight-line distance."] : []),
   ];
+  const city = location.split(",")[1]?.trim() ?? location;
+  const areaPhrase = facts.serviceArea?.inside === true
+    ? `inside the ${facts.serviceArea.thresholdMiles}-mile service area`
+    : facts.serviceArea?.inside === false
+      ? `outside the ${facts.serviceArea.thresholdMiles}-mile service area`
+      : "service-area eligibility not established";
+  const travelPhrase = facts.serviceArea?.travelMinutes
+    ? `, about ${Math.round(facts.serviceArea.travelMinutes)} minutes by road`
+    : "";
+  const opinion = facts.status === "FIELD_SURVEY_REQUIRED"
+    ? facts.serviceArea?.inside && facts.evInfrastructure?.stations.length === 0
+      ? "Good candidate — within reach and no public charging nearby yet"
+      : facts.serviceArea?.inside
+        ? "Looks like a solid opportunity — worth sending a team out"
+        : "Eligible for survey — confirm the details on the ground"
+    : facts.status === "OUTSIDE_SERVICE_AREA"
+      ? "Outside our coverage — not worth dispatching without a partner"
+      : facts.status === "ADDRESS_CORRECTION_REQUIRED"
+        ? "Can't assess this one yet — the address didn't resolve"
+        : "Hold for now — some data needs to be reviewed first";
+  const reasonParts = [
+    facts.serviceArea?.inside !== undefined
+      ? facts.serviceArea.inside
+        ? `it's ${areaPhrase}${travelPhrase}`
+        : `it's ${areaPhrase}${travelPhrase}`
+      : null,
+    inventory?.enabled && !inventory.unavailable && inventory.stations.length === 0
+      ? "there's no public charging nearby yet"
+      : inventory?.enabled && !inventory.unavailable && inventory.stations.length > 0
+        ? `there are already ${inventory.stations.length} public stations within ${inventory.searchRadiusMiles} miles`
+        : null,
+  ].filter(Boolean);
+  const reasonSentence = reasonParts.length ? `${reasonParts[0]?.charAt(0).toUpperCase()}${reasonParts[0]?.slice(1)}${reasonParts[1] ? `, and ${reasonParts[1]}` : ""}. ` : "";
+  const caveat = !facts.location.resolved
+    ? "The address couldn't be verified, so take these findings with caution."
+    : !facts.serviceArea?.routeAvailable
+      ? "Route distance is estimated — actual drive time needs confirmation."
+      : "";
   return {
-    headline: facts.status === "FIELD_SURVEY_REQUIRED" ? "Digital site check complete" : "Digital site check needs attention",
-    summary: `${location} was ${facts.location.resolved ? "resolved through Precisely" : "not reliably resolved"}. It is ${area}`,
+    headline: opinion,
+    summary: `${opinion.split(" — ")[0] === "Looks like a solid opportunity" ? "This looks like a solid opportunity." : `${opinion}.`} ${reasonSentence}${caveat}`.trim(),
     siteSignals: [
-      facts.location.preciselyId ? `Precisely site ID: ${facts.location.preciselyId}.` : "Precisely did not return a site ID.",
-      facts.location.matchMetadata ? `Address match score: ${facts.location.matchMetadata}.` : "Address match score was not returned.",
-      stationSignal,
-    ],
+      facts.serviceArea?.inside !== undefined
+        ? `${facts.serviceArea.inside ? "Inside" : "Outside"} service area · ${distance !== undefined ? `${distance.toFixed(1)} mi ${facts.serviceArea.routeAvailable ? "by road" : "straight-line"}` : "distance not reported"}`
+        : "Service area not established",
+      facts.evInfrastructure?.enabled && !facts.evInfrastructure.unavailable
+        ? `${facts.evInfrastructure.stations.length} public EV station${facts.evInfrastructure.stations.length === 1 ? "" : "s"} within ${facts.evInfrastructure.searchRadiusMiles} miles`
+        : "Public EV station data unavailable",
+      facts.property?.buildingArea && facts.property.buildingArea !== "-1"
+        ? `${Number(facts.property.buildingArea).toLocaleString(undefined, { maximumFractionDigits: 0 })} sq ft building`
+        : facts.jurisdiction?.ahj
+          ? `${facts.jurisdiction.ahj} AHJ`
+          : "Property data not reported",
+    ].filter(Boolean),
     dataLimitations: limitations,
     nextSteps: [facts.nextAction, "Confirm electrical capacity and physical routing during the field survey."],
     explanations: {
@@ -64,7 +103,7 @@ function rulesBrief(facts: BriefFacts): AssessmentBrief {
       evInfrastructure: inventory?.enabled && !inventory.unavailable
         ? `${inventory.stations.length} public EV station${inventory.stations.length === 1 ? " was" : "s were"} returned by the AFDC inventory within ${inventory.searchRadiusMiles} miles${nearestStation !== undefined ? `; the nearest reported distance is ${nearestStation.toFixed(1)} miles` : ""}. Nearby stations describe local public infrastructure only; they do not confirm on-site capacity, ownership, availability, or a need for new chargers.`
         : inventory?.message ?? "Public EV-station context was not returned for this run.",
-      evidenceCoverage: `${evidenceScore.score} of ${evidenceScore.maxScore} weighted evidence points were returned. ${evidenceScore.factors.filter((item) => item.earned < item.weight).map((item) => item.label.toLowerCase()).join(", ") || "All configured evidence categories"} ${evidenceScore.factors.some((item) => item.earned < item.weight) ? "have missing or fallback fields" : "were fully represented"}. The index measures coverage, not site quality or readiness.`,
+      evidenceCoverage: `${facts.evidenceScore.score} of ${facts.evidenceScore.maxScore} weighted evidence points were returned. ${facts.evidenceScore.factors.filter((item) => item.earned < item.weight).map((item) => item.label.toLowerCase()).join(", ") || "All configured evidence categories"} ${facts.evidenceScore.factors.some((item) => item.earned < item.weight) ? "have missing or fallback fields" : "were fully represented"}. The index measures coverage, not site quality or readiness.`,
       fieldSurvey: `The digital record cannot verify ${facts.gaps.slice(0, 4).map((gap) => gap.toLowerCase()).join(", ")}, or the other field-survey checks. Those require people, site access, and engineering judgement; no digital result changes that requirement.`,
     },
     source: "rules",
@@ -85,7 +124,7 @@ export async function assessmentBriefAgent(facts: BriefFacts): Promise<Assessmen
     const response = await client.responses.parse({
       model: env.OPENAI_MODEL,
       store: false,
-      instructions: "You are InstallIQ's evidence explanation layer for commercial EV site assessments. Use only the supplied normalized facts. Do not use outside knowledge, infer missing values, or make a recommendation that conflicts with the supplied policy status. Do not rewrite or reinterpret raw Precisely facts. Explain only their business context. Existing EV stations are nearby context only: they do not prove suitability, electrical capacity, development rights, utility approval, permit approval, pricing, or charger availability. The digital evidence coverage index is deterministic: do not change its value, weights, band, or its meaning. It measures returned data coverage only, never site quality, feasibility, approval, or readiness. State limitations clearly. Keep the summary under 70 words; return at most 4 short site signals, 4 limitations, and 3 next steps. Each explanation must be under 65 words and make its source boundary clear.",
+      instructions: "You are a straight-talking EV installation consultant reviewing a site assessment. Give your honest opinion — lead with whether this site is worth pursuing and why, based only on the supplied facts. Sound like a knowledgeable colleague giving their read, not a system report.\n\nFor the headline: one punchy opinion, e.g. 'Strong candidate — easy reach, large site' or 'Worth a look, but check the distance'.\n\nFor the summary: 2–3 sentences. Open with your take ('This looks like a solid opportunity…' / 'I'd be cautious here…' / 'Good candidate — …'). Then back it with 1–2 reasons from the data (service area, travel time, building size, EV density nearby). End with one honest caveat or limitation. Do NOT list data points — give a reasoned opinion. Under 65 words. Never mention status codes.\n\nFor siteSignals: 3–4 short evidence chips that support your opinion. Plain English only — e.g. '12 min from base', 'Large commercial building', '12 nearby public stations', 'Maricopa County AHJ'. No raw IDs, no technical codes.\n\nFor dataLimitations: plain sentences, under 4 items.\nFor nextSteps: action-oriented, under 3 items.\nFor explanations: clear, under 65 words each, state the data source boundary.",
       input: JSON.stringify({
         policyStatus: facts.status,
         nextAction: facts.nextAction,

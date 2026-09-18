@@ -101,7 +101,15 @@ export function AssessmentDashboard({ result, onCheckAnother }: { result: Assess
     setScrollToPlan(true);
   };
   return <div className="report-workspace" aria-live="polite">
-    <header className="report-heading"><h1>{result.location.standardizedAddress ?? result.location.submittedAddress}</h1><Button variant="outline" onClick={onCheckAnother}><RotateCcw size={15} /> New site</Button></header>
+    <header className="report-heading"><div><h1>{result.businessName}</h1><p>{result.location.standardizedAddress ?? result.location.submittedAddress}</p></div><Button variant="outline" onClick={onCheckAnother}><RotateCcw size={15} /> New site</Button></header>
+    <div className="report-verdict">
+      <div className="report-verdict-lead">
+        <span className={`report-verdict-dot ${result.status === "FIELD_SURVEY_REQUIRED" ? "go" : "nogo"}`} />
+        <strong className="report-verdict-label">{result.status === "FIELD_SURVEY_REQUIRED" ? "Suitable for field survey" : result.status === "OUTSIDE_SERVICE_AREA" ? "Outside service area" : result.status === "ADDRESS_CORRECTION_REQUIRED" ? "Address needs correction" : "Needs data review"}</strong>
+      </div>
+      <p className="report-verdict-summary">{result.brief.summary}</p>
+      {result.brief.siteSignals.length > 0 && <ul className="report-verdict-signals">{result.brief.siteSignals.map((signal) => <li key={signal}>{signal}</li>)}</ul>}
+    </div>
     <div className="report-hero"><div className="report-map"><SiteMap result={result} focus={mapFocus} onFocusChange={setMapFocus} /></div><DecisionPanel result={result} onReviewPlan={reviewPlan} /></div>
     <nav className="report-tabs" role="tablist" aria-label="Assessment views">{views.map(({ id, label, icon: Icon }) => <Button key={id} variant="ghost" role="tab" aria-selected={view === id} aria-controls={`report-panel-${id}`} className={view === id ? "active" : undefined} onClick={() => { setView(id); if (id === "charging") setMapFocus("chargers"); }}><Icon size={15} />{label}</Button>)}</nav>
     <div id={`report-panel-${view}`} role="tabpanel" className="report-panel">

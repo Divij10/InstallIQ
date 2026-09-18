@@ -5,6 +5,7 @@ const assessment: AssessmentResult = {
   status: "FIELD_SURVEY_REQUIRED",
   explanation: "The site identity was resolved and useful digital context was collected. Physical engineering and site facts still require a field survey.",
   nextAction: "Schedule field survey",
+  businessName: "Test Business",
   mode: "local",
   contact: {
     name: "Alex Johnson",

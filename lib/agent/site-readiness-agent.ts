@@ -35,7 +35,7 @@ export class SiteReadinessAgent {
       events.push(trace({ phase: "policy", type: "decision", message: `Digital evidence coverage calculated: ${evidenceScore.score}/${evidenceScore.maxScore}` }));
       events.push(trace({ phase: "policy", type: "completed", message: "Assessment policy evaluated: address correction required", status }));
       const brief = await assessmentBriefAgent({ status, location: location.data, evidenceScore, nextAction: next.nextAction, gaps });
-      return { status, ...next, evidenceScore, brief, contact: contact.data, location: location.data, gaps, warnings, evidence, trace: events, mode: this.mode };
+      return { status, ...next, businessName: request.businessName, evidenceScore, brief, contact: contact.data, location: location.data, gaps, warnings, evidence, trace: events, mode: this.mode };
     }
 
     events.push(trace({ phase: "policy", type: "decision", message: "Site resolved; independent enrichment skills are now eligible." }));
@@ -53,6 +53,6 @@ export class SiteReadinessAgent {
     events.push(trace({ phase: "policy", type: "decision", message: `Digital evidence coverage calculated: ${evidenceScore.score}/${evidenceScore.maxScore}` }));
     events.push(trace({ phase: "policy", type: "completed", message: `Assessment policy evaluated: ${status.replaceAll("_", " ")}`, status }));
     const brief = await assessmentBriefAgent({ status, location: location.data, property: property.data, jurisdiction: jurisdiction.data, siteContext: siteContext.data, serviceArea: serviceArea.data, evInfrastructure: evInfrastructure.data, evidenceScore, nextAction: next.nextAction, gaps });
-    return { status, ...next, evidenceScore, brief, contact: contact.data, location: location.data, property: property.data, jurisdiction: jurisdiction.data, siteContext: siteContext.data, serviceArea: serviceArea.data, evInfrastructure: evInfrastructure.data, gaps, warnings, evidence, trace: events, mode: this.mode };
+    return { status, ...next, businessName: request.businessName, evidenceScore, brief, contact: contact.data, location: location.data, property: property.data, jurisdiction: jurisdiction.data, siteContext: siteContext.data, serviceArea: serviceArea.data, evInfrastructure: evInfrastructure.data, gaps, warnings, evidence, trace: events, mode: this.mode };
   }
 }
