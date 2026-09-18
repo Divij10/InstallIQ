@@ -1,6 +1,6 @@
 # InstallIQ agent guide
 
-Read [INSTALLIQ_SPEC.md](INSTALLIQ_SPEC.md) for the original brief, but treat the code and `docs/` as the current truth where they differ. Architecture and the code map live in `docs/architecture.md`, the capability-to-action bindings in `docs/precisely-capability-map.md`, known gaps in `docs/limitations.md`, and running and demo guidance in `README.md`.
+Read [INSTALLIQ_SPEC.md](INSTALLIQ_SPEC.md) for the original brief, but treat the code and `docs/` as the current truth where they differ. Architecture and the code map, the capability-to-action bindings, how the DIS MCP gateway exposes the Precisely APIs, best practices, live setup, known gaps, and the demo script all live in [docs/DOCUMENTATION.md](docs/DOCUMENTATION.md); running guidance is in `README.md`.
 
 Non-negotiables:
 
