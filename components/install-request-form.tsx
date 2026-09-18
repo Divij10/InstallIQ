@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { AssessmentRequest } from "@/lib/domain/assessment";
 
 type AddressSuggestion = { label: string };
@@ -21,6 +21,7 @@ export function InstallRequestForm({ onRun, running }: { onRun: (request: Assess
   const [addressTouched, setAddressTouched] = useState(false);
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
   const [suggesting, setSuggesting] = useState(false);
+  const submitRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!addressTouched || form.rawAddress.trim().length < 3) { setSuggestions([]); return; }
@@ -38,11 +39,8 @@ export function InstallRequestForm({ onRun, running }: { onRun: (request: Assess
     return () => { window.clearTimeout(timer); controller.abort(); };
   }, [addressTouched, form.rawAddress]);
 
-  const selectAddress = (label: string) => { setForm((current) => ({ ...current, rawAddress: label })); setSuggestions([]); };
+  const selectAddress = (label: string) => { setForm((current) => ({ ...current, rawAddress: label })); setSuggestions([]); requestAnimationFrame(() => submitRef.current?.focus()); };
   return <section className="intake-card" aria-label="Start a site assessment">
-    <div className="eyebrow">LIVE PRE-SITE CHECK</div>
-    <h2>Where is the installation?</h2>
-    <p>We verify the site before asking your team for technical survey details.</p>
     <form onSubmit={(event) => { event.preventDefault(); onRun(form); }}>
       <label htmlFor="business">Site or business name</label>
       <input id="business" value={form.businessName} onChange={(event) => setForm((current) => ({ ...current, businessName: event.target.value }))} placeholder="Desert Ridge Marketplace" required autoComplete="organization" />
@@ -51,8 +49,8 @@ export function InstallRequestForm({ onRun, running }: { onRun: (request: Assess
         <input id="address" value={form.rawAddress} onChange={(event) => { setAddressTouched(true); setForm((current) => ({ ...current, rawAddress: event.target.value })); }} placeholder="Start typing an address" required autoComplete="street-address" aria-describedby="address-help" />
         {suggestions.length > 0 && <ul className="address-suggestions" role="listbox">{suggestions.map((suggestion) => <li key={suggestion.label}><button type="button" onClick={() => selectAddress(suggestion.label)}>{suggestion.label}</button></li>)}</ul>}
       </div>
-      <small id="address-help">{suggesting ? "Finding address suggestions…" : "Choose a suggestion to verify the site faster."}</small>
-      <button className="primary" disabled={running}>{running ? "VERIFYING SITE…" : "CHECK THIS SITE"}</button>
+      {suggesting && <small id="address-help">Finding address suggestions…</small>}
+      <button ref={submitRef} className="primary" disabled={running}>{running ? "VERIFYING SITE…" : "CHECK THIS SITE"}</button>
     </form>
   </section>;
 }

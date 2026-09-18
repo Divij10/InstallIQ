@@ -9,6 +9,14 @@ import { RawEvidenceDrawer } from "./raw-evidence-drawer";
 import { SiteMap, type MapFocus } from "./site-map";
 import { Button } from "./ui/button";
 
+function formatAddress(address: string): string {
+  return address
+    .replace(/, UNITED STATES OF AMERICA$/i, "")
+    .toLowerCase()
+    .replace(/\b\w/g, c => c.toUpperCase())
+    .replace(/,\s([A-Z][a-z])\s(\d)/, (_, state, digit) => `, ${state.toUpperCase()} ${digit}`);
+}
+
 type View = "overview" | "record" | "charging" | "activity";
 
 const views: Array<{ id: View; label: string; icon: typeof MapPinned }> = [
@@ -71,7 +79,7 @@ export function AssessmentDashboard({ result, onCheckAnother }: { result: Assess
   const [view, setView] = useState<View>("overview");
   const [mapFocus, setMapFocus] = useState<MapFocus>("site");
   return <div className="report-workspace" aria-live="polite">
-    <header className="report-heading"><div><h1>{result.businessName}</h1><p>{result.location.standardizedAddress ?? result.location.submittedAddress}</p></div><Button variant="outline" onClick={onCheckAnother}><RotateCcw size={15} /> New site</Button></header>
+    <header className="report-heading"><div><h1>{result.businessName}</h1><p>{formatAddress(result.location.standardizedAddress ?? result.location.submittedAddress)}</p></div><Button variant="outline" onClick={onCheckAnother}><RotateCcw size={15} /> New site</Button></header>
     <div className="report-verdict">
       <div className="report-verdict-text">
         <div className="report-verdict-lead">

@@ -24,9 +24,11 @@ export async function GET(request: NextRequest) {
   try {
     await client.connect();
     const result = await client.invoke("ADDRESS_AUTOCOMPLETE", { query });
-    if (result.status !== "success") return NextResponse.json({ suggestions: [], message: result.message });
+    if (result.status !== "success") return NextResponse.json({ suggestions: [] });
     return NextResponse.json({ suggestions: collectLabels(result.data).map((label) => ({ label })) });
+  } catch {
+    return NextResponse.json({ suggestions: [] });
   } finally {
-    await client.close();
+    await client.close().catch(() => undefined);
   }
 }
