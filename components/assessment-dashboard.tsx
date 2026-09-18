@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import type { AssessmentResult } from "@/lib/domain/assessment";
-import { Activity, ArrowRight, Building2, ClipboardList, Database, MapPinned, RotateCcw } from "lucide-react";
+import { Activity, ArrowRight, Building2, Database, MapPinned, RotateCcw } from "lucide-react";
 import { AgentActivity } from "./agent-activity";
 import { NearbyCharging, SiteRecord } from "./detailed-site-report";
 import { RawEvidenceDrawer } from "./raw-evidence-drawer";
-import { SiteMap } from "./site-map";
+import { SiteMap, type MapFocus } from "./site-map";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 
@@ -40,7 +40,6 @@ function DecisionPanel({ result, onReviewPlan }: { result: AssessmentResult; onR
   const distanceLabel = area?.routeAvailable ? "Driving route" : "Straight-line fallback";
   return <section className="report-decision" aria-label="Assessment decision">
     <div className="report-decision-top">
-      <span className="report-kicker">Assessment decision</span>
       <Badge className={`report-status ${result.status.toLowerCase()}`}>{result.status.replaceAll("_", " ")}</Badge>
       <h2>{result.nextAction}</h2>
       <p>{result.explanation}</p>
@@ -62,7 +61,7 @@ function FindingRow({ label, value, supporting, source }: { label: string; value
 function Findings({ result }: { result: AssessmentResult }) {
   const stations = result.evInfrastructure;
   return <section className="report-findings" aria-label="Digital findings">
-    <div className="report-section-title"><div><span className="report-kicker">01 / Digital findings</span><h2>Site findings</h2></div><p>Source facts gathered before a field visit.</p></div>
+    <div className="report-section-title"><h2>Site findings</h2></div>
     <div className="report-finding-table">
       <FindingRow label="Site identity" value={display(result.location.preciselyId)} supporting={`Address match ${display(result.location.matchMetadata)}`} source="Precisely" />
       <FindingRow label="Property" value={squareFeet(result.property?.buildingArea)} supporting={`Parcel area ${squareFeet(result.property?.lotArea)}`} source="Precisely" />
@@ -76,20 +75,21 @@ function NextSteps({ result }: { result: AssessmentResult }) {
   const needsSurvey = result.status === "FIELD_SURVEY_REQUIRED";
   const handoffItems = needsSurvey ? result.gaps.slice(0, 6) : result.status === "ADDRESS_CORRECTION_REQUIRED" ? ["Confirm the street address and any unit number", "Run the digital assessment again after correction"] : result.status === "OUTSIDE_SERVICE_AREA" ? ["Review the request with an out-of-area sales contact", "Confirm whether a local installation partner is needed"] : ["Inspect the source evidence for errors or conflicts", "Resolve the missing information before dispatch"];
   return <section className="report-next" id="report-next-steps" aria-label="Next steps">
-    <div className="report-section-title"><div><span className="report-kicker">02 / Human follow-up</span><h2>Next steps</h2></div></div>
+    <div className="report-section-title"><h2>{needsSurvey ? "Survey plan" : "Next steps"}</h2></div>
     <div className="report-next-grid">
-      <div className="report-next-intro"><ClipboardList size={19} /><h3>{result.nextAction}</h3><p>{needsSurvey ? result.brief.explanations.fieldSurvey : result.explanation}</p></div>
+      <div className="report-next-intro"><p>{needsSurvey ? result.brief.explanations.fieldSurvey : result.explanation}</p></div>
       <div className="report-survey-list"><span>{needsSurvey ? "Checks to prepare" : "Handoff items"}</span><ul>{handoffItems.map((item, index) => <li key={item}><span>{String(index + 1).padStart(2, "0")}</span>{item}</li>)}</ul></div>
     </div>
   </section>;
 }
 
 function ActivityView({ result }: { result: AssessmentResult }) {
-  return <section className="report-activity" aria-label="Source activity"><div className="report-section-title"><div><span className="report-kicker">Evidence trail</span><h2>Source activity</h2></div><p>Actions, responses, and provenance for this run.</p></div><AgentActivity events={result.trace} /><RawEvidenceDrawer evidence={result.evidence} /></section>;
+  return <section className="report-activity" aria-label="Source activity"><AgentActivity events={result.trace} /><RawEvidenceDrawer evidence={result.evidence} /></section>;
 }
 
 export function AssessmentDashboard({ result, onCheckAnother }: { result: AssessmentResult; onCheckAnother: () => void }) {
   const [view, setView] = useState<View>("overview");
+  const [mapFocus, setMapFocus] = useState<MapFocus>("site");
   const [scrollToPlan, setScrollToPlan] = useState(false);
   useEffect(() => {
     if (view !== "overview" || !scrollToPlan) return;
@@ -101,13 +101,13 @@ export function AssessmentDashboard({ result, onCheckAnother }: { result: Assess
     setScrollToPlan(true);
   };
   return <div className="report-workspace" aria-live="polite">
-    <header className="report-heading"><div><span className="report-kicker">Site assessment <span aria-hidden="true">/</span> {result.mode === "hosted" ? "Live data" : "Local data"}</span><h1>{result.location.standardizedAddress ?? result.location.submittedAddress}</h1><p>Digital pre-site intelligence for a commercial EV installation request</p></div><Button variant="outline" onClick={onCheckAnother}><RotateCcw size={15} /> New site</Button></header>
-    <div className="report-hero"><div className="report-map"><SiteMap result={result} /></div><DecisionPanel result={result} onReviewPlan={reviewPlan} /></div>
-    <nav className="report-tabs" role="tablist" aria-label="Assessment views">{views.map(({ id, label, icon: Icon }) => <Button key={id} variant="ghost" role="tab" aria-selected={view === id} aria-controls={`report-panel-${id}`} className={view === id ? "active" : undefined} onClick={() => setView(id)}><Icon size={15} />{label}</Button>)}</nav>
+    <header className="report-heading"><h1>{result.location.standardizedAddress ?? result.location.submittedAddress}</h1><Button variant="outline" onClick={onCheckAnother}><RotateCcw size={15} /> New site</Button></header>
+    <div className="report-hero"><div className="report-map"><SiteMap result={result} focus={mapFocus} onFocusChange={setMapFocus} /></div><DecisionPanel result={result} onReviewPlan={reviewPlan} /></div>
+    <nav className="report-tabs" role="tablist" aria-label="Assessment views">{views.map(({ id, label, icon: Icon }) => <Button key={id} variant="ghost" role="tab" aria-selected={view === id} aria-controls={`report-panel-${id}`} className={view === id ? "active" : undefined} onClick={() => { setView(id); if (id === "charging") setMapFocus("chargers"); }}><Icon size={15} />{label}</Button>)}</nav>
     <div id={`report-panel-${view}`} role="tabpanel" className="report-panel">
       {view === "overview" && <><Findings result={result} /><NextSteps result={result} />{result.warnings.length > 0 && <div className="report-notes"><strong>Data notes</strong><ul>{result.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></div>}</>}
       {view === "record" && <SiteRecord result={result} />}
-      {view === "charging" && <NearbyCharging result={result} />}
+      {view === "charging" && <NearbyCharging result={result} onViewMap={() => { setMapFocus("chargers"); document.getElementById("main-site-map")?.scrollIntoView({ behavior: "smooth", block: "center" }); }} />}
       {view === "activity" && <ActivityView result={result} />}
     </div>
   </div>;

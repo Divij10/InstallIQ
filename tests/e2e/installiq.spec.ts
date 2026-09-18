@@ -124,7 +124,11 @@ test("assessment results keep labels and values visually separated", async ({ pa
   await expect(page.getByRole("heading", { name: "Schedule field survey" }).first()).toBeVisible();
   await expect(page.getByRole("heading", { name: "Site findings" })).toBeVisible();
   await page.getByRole("tab", { name: "Site record" }).click();
-  await expect(page.getByLabel("Site record")).toContainText("Precisely ID");
+  const identitySection = page.getByRole("button", { name: /Site identity/ });
+  await expect(identitySection).toHaveAttribute("aria-expanded", "false");
+  await identitySection.click();
+  await expect(identitySection).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByLabel("Site record").getByText("Precisely ID")).toBeVisible();
   await page.getByRole("tab", { name: "Source activity" }).click();
   await expect(page.getByLabel("Source activity")).toContainText("ADDRESS_VERIFY");
 });

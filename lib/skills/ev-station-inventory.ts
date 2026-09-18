@@ -11,6 +11,8 @@ type AfdcStation = {
   city?: string;
   state?: string;
   zip?: string;
+  latitude?: number;
+  longitude?: number;
   ev_network?: string;
   distance?: number;
   status_code?: string;
@@ -29,10 +31,14 @@ function stationAddress(station: AfdcStation) {
 
 function normalizeStation(station: AfdcStation): EvStation | undefined {
   if (typeof station.id !== "number" || !station.station_name) return undefined;
+  const validCoordinates = typeof station.latitude === "number" && Number.isFinite(station.latitude) && station.latitude >= -90 && station.latitude <= 90
+    && typeof station.longitude === "number" && Number.isFinite(station.longitude) && station.longitude >= -180 && station.longitude <= 180;
   return {
     id: station.id,
     name: station.station_name,
     address: stationAddress(station),
+    latitude: validCoordinates ? station.latitude : undefined,
+    longitude: validCoordinates ? station.longitude : undefined,
     network: station.ev_network,
     distanceMiles: typeof station.distance === "number" ? station.distance : undefined,
     status: station.status_code,
