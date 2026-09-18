@@ -14,8 +14,6 @@ Set `INSTALLIQ_DATA_MODE=hosted`, the hosted Precisely MCP URL, and server-side 
 
 ## Architecture
 
-# Architecture
-
 ```mermaid
 flowchart TD
   U[Coordinator] --> UI[Next.js UI]
