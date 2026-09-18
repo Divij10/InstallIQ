@@ -9,13 +9,6 @@ const assessment: AssessmentResult = {
   chargerType: "LEVEL_2",
   chargerCount: 2,
   mode: "local",
-  contact: {
-    name: "Alex Johnson",
-    nameStatus: "Not requested",
-    emailStatus: "Not requested",
-    phoneStatus: "Not requested",
-    warnings: []
-  },
   location: {
     submittedAddress: "1317 S Terrace Rd, Tempe, AZ 85281",
     standardizedAddress: "1317 S TERRACE RD, TEMPE AZ 85281-5814, UNITED STATES OF AMERICA",
@@ -38,8 +31,7 @@ const assessment: AssessmentResult = {
     disclaimer: "Location context is not a permit determination."
   },
   siteContext: {
-    timeZone: "America/Phoenix",
-    places: ["Tempe"]
+    timeZone: "America/Phoenix"
   },
   serviceArea: {
     enabled: true,

@@ -7,10 +7,9 @@ InstallIQ addresses Precisely through internal capability names, never raw tool 
 | Address suggestions (`/api/address-suggestions`) | `ADDRESS_AUTOCOMPLETE` | `geo_addressing.autocomplete` | Optional | Reduce mistyped intake addresses |
 | Address Resolution | `ADDRESS_VERIFY` | `geo_addressing.verify_address` | Yes | Establish physical site identity |
 | Address Resolution | `ADDRESS_GEOCODE` | `geo_addressing.geocode` | Yes | Obtain coordinates and the Precisely ID |
-| Contact Validation | `CONTACT_NAME_PARSE`, `CONTACT_EMAIL_VERIFY`, `CONTACT_PHONE_VALIDATE` | `verification.parse_name`, `verification.emails`, `verification.phones` | Optional | Contact usability; skipped when a field is not supplied |
 | Property Intelligence | `PROPERTY_ATTRIBUTES`, `BUILDING_INFORMATION`, `PARCEL_INFORMATION`, `ROOF_ATTRIBUTES` | `property.structure`, `property.buildings`, `property.parcels`, `property.roof_attributes` | Optional but important | Site context, keyed to the Precisely ID so every field describes the same site |
 | Jurisdiction Context | `TAX_JURISDICTION`, `AUTHORITY_HAVING_JURISDICTION` | `tax.jurisdiction`, `emergency.services` | Optional | Location context, not permit status |
-| Site Context | `TIMEZONE`, `PLACES_CONTEXT` | `timezone.lookup`, `address_proximity.search` | Optional | Timezone and nearby commercial-place context |
+| Site Context | `TIMEZONE` | `timezone.lookup` | Optional | Timezone context |
 | Service Area | `ROUTE_OR_TRAVEL_TIME` | `routing.directions` | Yes | Configured operating boundary; Haversine remains a transparent fallback |
 
 The `PreciselyCapability` union in `lib/precisely/types.ts` is the single source of truth for this list. Adding a capability means adding it there, mapping it to an approved action in `lib/precisely/action-gateway-adapter.ts`, giving it a search goal and an input transform, and adding a local alias in `lib/precisely/capability-registry.ts`.

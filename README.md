@@ -41,9 +41,9 @@ flowchart TD
   T --> UI
 ```
 
-The browser submits only an installation request; it cannot name or invoke MCP tools. The agent runs optional contact checks, then address resolution. An unresolved address stops all site-specific enrichment. On resolution, the independent Precisely skills, the AFDC public EV-station lookup, and the service-area skill run concurrently.
+The browser submits only an installation request; it cannot name or invoke MCP tools. The agent starts with address resolution. An unresolved address stops all site-specific enrichment. On resolution, the independent Precisely skills, the AFDC public EV-station lookup, and the service-area skill run concurrently.
 
-The hosted Data Integrity Suite MCP gateway is the active Precisely integration. Every approved capability follows search → describe → schema validation → execute, against a fixed capability-to-action map held server-side; the semantic search result is only accepted when it contains the approved action ID. The app uses it for address autocomplete, address identity, coordinates, property/building/parcel/roof observations, tax and AHJ context, timezone, nearby physical places, and routing. In `local` mode the same client falls back to name-matching whatever tools a local Precisely MCP server exposes. Precisely results remain distinct from AFDC data and InstallIQ calculations.
+The hosted Data Integrity Suite MCP gateway is the active Precisely integration. Every approved capability follows search → describe → schema validation → execute, against a fixed capability-to-action map held server-side; the semantic search result is only accepted when it contains the approved action ID. The app uses it for address autocomplete, address identity, coordinates, property/building/parcel/roof observations, tax and AHJ context, timezone, and routing. In `local` mode the same client falls back to name-matching whatever tools a local Precisely MCP server exposes. Precisely results remain distinct from AFDC data and InstallIQ calculations.
 
 The final policy and the Digital Evidence Coverage Index are deterministic. The index has published weights for returned site identity, service-area, property, jurisdiction, and public-EV-infrastructure evidence. It is a data-coverage measure only—not a feasibility, site-quality, permitting, cost, capacity, or approval score. OpenAI is optional and explanation-only: it receives normalized facts plus that fixed breakdown, has no tools, cannot change policy or score, and is constrained to state data limitations rather than infer electrical capacity, permits, utility approval, costs, site control, or charger availability. When no key is configured or the call fails, a deterministic rules brief is returned instead and labelled as such.
 
@@ -67,7 +67,7 @@ Every external call is wrapped as `Evidence` with a provider (`Precisely`, `AFDC
 
 1. `InstallRequestForm` collects a site name and an installation address. Typing three or more characters debounces a call to `/api/address-suggestions`, which runs `geo_addressing.autocomplete` server-side and returns up to five labels.
 2. `POST /api/assessment` validates the request with Zod, opens one MCP connection, and runs `SiteReadinessAgent`.
-3. The agent runs the optional contact check, then address verification and geocoding. **An unresolved address stops all site-specific enrichment** and returns `ADDRESS_CORRECTION_REQUIRED`.
+3. The agent runs address verification and geocoding. **An unresolved address stops all site-specific enrichment** and returns `ADDRESS_CORRECTION_REQUIRED`.
 4. On resolution, property, jurisdiction, site context, service area, and the AFDC EV-station lookup run concurrently.
 5. A deterministic policy picks the status, a deterministic index scores evidence coverage, and the optional OpenAI brief explains the result. Every skill contributes normalized evidence and trace events that ship with the response.
 
@@ -105,15 +105,13 @@ Bands: `Strong` at 80 or above, `Developing` at 50 or above, otherwise `Limited`
 | Address suggestions | `geo_addressing.autocomplete` | Partial address, USA country, max five results |
 | Address verification | `geo_addressing.verify_address` | Full address |
 | Geocoding | `geo_addressing.geocode` | Full address |
-| Contact checks | `verification.parse_name`, `verification.emails`, `verification.phones` | Action-specific wrapper/batch inputs |
 | Tax context | `tax.jurisdiction` | Resolved longitude/latitude record |
 | AHJ context | `emergency.services` | Resolved coordinate pair |
 | Timezone | `timezone.lookup` | Resolved coordinate pair plus timestamp |
-| Nearby physical-place context | `address_proximity.search` | Resolved coordinates, `physical-places` dataset, 0.5-mile radius |
 | Driving route / travel time | `routing.directions` | Service-base and site coordinates |
 | Property, building, parcel, roof context | `property.structure`, `property.buildings`, `property.parcels`, `property.roof_attributes` | Precisely ID returned by address verification |
 
-Every unavailable action is shown as unavailable rather than fabricated. Nearby commercial-place results remain optional and do not establish EV charger inventory. The contact actions only run when a contact name, email, or phone is supplied; the current form does not collect them, so they normally report "Not supplied".
+Every unavailable action is shown as unavailable rather than fabricated.
 
 ## Commands
 

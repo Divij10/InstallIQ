@@ -20,7 +20,7 @@
 
 - There is no authentication, database, CRM, dispatching, or report export. Every assessment is ephemeral and lives only in the browser tab that ran it.
 - There is no mock or fixture data mode. With no MCP endpoint configured the assessment API fails, by design.
-- The request form collects only a site name and address. The request model still carries contact fields and charger type/count, so those are submitted as empty and `UNKNOWN`/`1`, and the contact checks report "Not supplied".
+- The request form collects only a site name and address. The request model still carries charger type/count, so those are submitted as `UNKNOWN`/`1`.
 - Raw source responses are rendered in the evidence drawer as returned. The `redact` helper exists in `lib/precisely/redact.ts` but is not yet applied to that view, so treat the drawer as unredacted.
 - The Playwright suite covers one report path and currently asserts the pre-redesign dashboard markup, so `npm run test:e2e` fails until it is updated. `npm run lint`, `npm run typecheck`, and `npm test` pass.
 - `components/status-banner.tsx`, `assessment-rail.tsx`, `site-stats-bento.tsx`, `digital-evidence-coverage.tsx`, and `evidence-explanation-panels.tsx` are left over from the earlier dashboard and are no longer rendered.

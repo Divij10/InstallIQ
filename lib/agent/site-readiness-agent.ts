@@ -1,6 +1,5 @@
 import type { AssessmentRequest, AssessmentResult } from "@/lib/domain/assessment";
 import type { PreciselyClient } from "@/lib/precisely/types";
-import { contactValidationSkill } from "@/lib/skills/contact-validation";
 import { addressResolutionSkill } from "@/lib/skills/address-resolution";
 import { propertyIntelligenceSkill } from "@/lib/skills/property-intelligence";
 import { jurisdictionContextSkill } from "@/lib/skills/jurisdiction-context";
@@ -22,9 +21,6 @@ export class SiteReadinessAgent {
     const evidence: AssessmentResult["evidence"] = [];
     const events = [trace({ phase: "request", type: "observation", message: "Request received" })];
     const warnings: string[] = [];
-    const contact = await contactValidationSkill(this.client, request);
-    evidence.push(...contact.evidence); events.push(...contact.trace); warnings.push(...contact.warnings);
-    events.push(trace({ phase: "policy", type: "decision", message: "Contact validation does not block location processing." }));
     const location = await addressResolutionSkill(this.client, request);
     evidence.push(...location.evidence); events.push(...location.trace); warnings.push(...location.warnings);
 
@@ -35,7 +31,7 @@ export class SiteReadinessAgent {
       events.push(trace({ phase: "policy", type: "decision", message: `Digital evidence coverage calculated: ${evidenceScore.score}/${evidenceScore.maxScore}` }));
       events.push(trace({ phase: "policy", type: "completed", message: "Assessment policy evaluated: address correction required", status }));
       const brief = await assessmentBriefAgent({ status, location: location.data, evidenceScore, nextAction: next.nextAction, gaps });
-      return { status, ...next, businessName: request.businessName, chargerType: request.chargerType, chargerCount: request.chargerCount, evidenceScore, brief, contact: contact.data, location: location.data, gaps, warnings, evidence, trace: events, mode: this.mode };
+      return { status, ...next, businessName: request.businessName, chargerType: request.chargerType, chargerCount: request.chargerCount, evidenceScore, brief, location: location.data, gaps, warnings, evidence, trace: events, mode: this.mode };
     }
 
     events.push(trace({ phase: "policy", type: "decision", message: "Site resolved; independent enrichment skills are now eligible." }));
@@ -53,6 +49,6 @@ export class SiteReadinessAgent {
     events.push(trace({ phase: "policy", type: "decision", message: `Digital evidence coverage calculated: ${evidenceScore.score}/${evidenceScore.maxScore}` }));
     events.push(trace({ phase: "policy", type: "completed", message: `Assessment policy evaluated: ${status.replaceAll("_", " ")}`, status }));
     const brief = await assessmentBriefAgent({ status, location: location.data, property: property.data, jurisdiction: jurisdiction.data, siteContext: siteContext.data, serviceArea: serviceArea.data, evInfrastructure: evInfrastructure.data, evidenceScore, nextAction: next.nextAction, gaps });
-    return { status, ...next, businessName: request.businessName, chargerType: request.chargerType, chargerCount: request.chargerCount, evidenceScore, brief, contact: contact.data, location: location.data, property: property.data, jurisdiction: jurisdiction.data, siteContext: siteContext.data, serviceArea: serviceArea.data, evInfrastructure: evInfrastructure.data, gaps, warnings, evidence, trace: events, mode: this.mode };
+    return { status, ...next, businessName: request.businessName, chargerType: request.chargerType, chargerCount: request.chargerCount, evidenceScore, brief, location: location.data, property: property.data, jurisdiction: jurisdiction.data, siteContext: siteContext.data, serviceArea: serviceArea.data, evInfrastructure: evInfrastructure.data, gaps, warnings, evidence, trace: events, mode: this.mode };
   }
 }

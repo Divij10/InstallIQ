@@ -7,9 +7,6 @@ type ActionDetails = { actionId: string; inputsSchema?: JsonRecord; examples?: u
 const asRecord = (value: unknown): JsonRecord | undefined => value && typeof value === "object" && !Array.isArray(value) ? value as JsonRecord : undefined;
 
 const approvedActions: Partial<Record<PreciselyCapability, string>> = {
-  CONTACT_NAME_PARSE: "verification.parse_name",
-  CONTACT_EMAIL_VERIFY: "verification.emails",
-  CONTACT_PHONE_VALIDATE: "verification.phones",
   ADDRESS_AUTOCOMPLETE: "geo_addressing.autocomplete",
   ADDRESS_VERIFY: "geo_addressing.verify_address",
   ADDRESS_GEOCODE: "geo_addressing.geocode",
@@ -20,7 +17,6 @@ const approvedActions: Partial<Record<PreciselyCapability, string>> = {
   TAX_JURISDICTION: "tax.jurisdiction",
   AUTHORITY_HAVING_JURISDICTION: "emergency.services",
   TIMEZONE: "timezone.lookup",
-  PLACES_CONTEXT: "address_proximity.search",
   ROUTE_OR_TRAVEL_TIME: "routing.directions"
 };
 
@@ -89,14 +85,10 @@ export class ActionGatewayAdapter extends DirectToolAdapter {
     const latitude = typeof source.latitude === "number" ? source.latitude : undefined;
     const longitude = typeof source.longitude === "number" ? source.longitude : undefined;
     switch (capability) {
-      case "CONTACT_NAME_PARSE": return { data: { name: source.name } };
-      case "CONTACT_EMAIL_VERIFY": return { emails: [{ id: "installiq", email: source.email }] };
-      case "CONTACT_PHONE_VALIDATE": return { phones: [{ id: "installiq", phoneNumber: source.phone, country: "US" }] };
       case "ADDRESS_AUTOCOMPLETE": return { address: { addressLines: [source.query], country: "USA" }, express: true, preferences: { maxResults: 5 } };
       case "TAX_JURISDICTION": return latitude !== undefined && longitude !== undefined ? { input_type: "location", records: [{ longitude, latitude }] } : { input_type: "address", records: [{ addressLines: [address] }] };
       case "AUTHORITY_HAVING_JURISDICTION": return latitude !== undefined && longitude !== undefined ? { location: { coordinates: [longitude, latitude] }, include_ahj: true } : { address: { addressLines: [address] }, include_ahj: true };
       case "TIMEZONE": return latitude !== undefined && longitude !== undefined ? { locations: [{ id: "installiq", timestamp: Date.now(), geometry: { coordinates: [longitude, latitude] } }] } : {};
-      case "PLACES_CONTEXT": return latitude !== undefined && longitude !== undefined ? { preferences: { dataset: "physical-places", maxResults: 5, distance: { value: 0.5, distanceUnit: "MILE" }, autoRoute: true }, location: { addressId: "installiq", country: "USA", latitude, longitude } } : {};
       case "ROUTE_OR_TRAVEL_TIME": {
         const r: JsonRecord = { option: "flexible", origin: source.origin, destination: source.destination };
         if (typeof source.mode === "string") r.mode = source.mode;
@@ -125,7 +117,7 @@ export class ActionGatewayAdapter extends DirectToolAdapter {
 
   private goalFor(capability: PreciselyCapability): string {
     const goals: Record<PreciselyCapability, string> = {
-      CONTACT_NAME_PARSE: "parse a person's name", CONTACT_EMAIL_VERIFY: "validate an email address", CONTACT_PHONE_VALIDATE: "validate a phone number", ADDRESS_AUTOCOMPLETE: "autocomplete a street address while a user types", ADDRESS_VERIFY: "validate and standardize a street address", ADDRESS_GEOCODE: "geocode a street address to latitude longitude and PreciselyID", PROPERTY_ATTRIBUTES: "retrieve property structure for an address", BUILDING_INFORMATION: "retrieve building information for an address", PARCEL_INFORMATION: "retrieve parcel information for an address", ROOF_ATTRIBUTES: "retrieve roof attributes for an address", TAX_JURISDICTION: "look up tax jurisdiction for a street address", AUTHORITY_HAVING_JURISDICTION: "find emergency services or AHJ context for a street address", TIMEZONE: "look up timezone from coordinates", PLACES_CONTEXT: "find physical places near a commercial site using latitude and longitude", ROUTE_OR_TRAVEL_TIME: "get traffic-aware driving directions between locations"
+      ADDRESS_AUTOCOMPLETE: "autocomplete a street address while a user types", ADDRESS_VERIFY: "validate and standardize a street address", ADDRESS_GEOCODE: "geocode a street address to latitude longitude and PreciselyID", PROPERTY_ATTRIBUTES: "retrieve property structure for an address", BUILDING_INFORMATION: "retrieve building information for an address", PARCEL_INFORMATION: "retrieve parcel information for an address", ROOF_ATTRIBUTES: "retrieve roof attributes for an address", TAX_JURISDICTION: "look up tax jurisdiction for a street address", AUTHORITY_HAVING_JURISDICTION: "find emergency services or AHJ context for a street address", TIMEZONE: "look up timezone from coordinates", ROUTE_OR_TRAVEL_TIME: "get traffic-aware driving directions between locations"
     };
     return goals[capability];
   }

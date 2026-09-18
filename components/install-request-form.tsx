@@ -7,9 +7,6 @@ type AddressSuggestion = { label: string };
 
 const initial: AssessmentRequest = {
   businessName: "",
-  contactName: "",
-  email: "",
-  phone: "",
   rawAddress: "",
   chargerType: "UNKNOWN",
   chargerCount: 1,
