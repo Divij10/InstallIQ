@@ -30,12 +30,11 @@ function loadGoogleMaps3d(apiKey: string) {
   return maps3dLoader;
 }
 
-export function SiteMap({ result }: { result: AssessmentResult }) {
+export function SiteMap({ result, compact = false }: { result: AssessmentResult; compact?: boolean }) {
   const host = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<"loading" | "ready3d" | "ready2d" | "unavailable" | "error">("loading");
   const latitude = result.location.latitude;
   const longitude = result.location.longitude;
-  const route = result.serviceArea;
 
   useEffect(() => {
     if (latitude === undefined || longitude === undefined) { setState("unavailable"); return; }
@@ -55,7 +54,7 @@ export function SiteMap({ result }: { result: AssessmentResult }) {
           const center = { lat: latitude, lng: longitude };
           const twoDimensionalMap = new runtime.maps.Map(host.current, {
             center,
-            zoom: 18,
+            zoom: compact ? 20 : 18,
             mapTypeId: "satellite",
             disableDefaultUI: true,
             gestureHandling: "cooperative",
@@ -67,7 +66,7 @@ export function SiteMap({ result }: { result: AssessmentResult }) {
         }
         const map = document.createElement("gmp-map-3d");
         map.setAttribute("center", `${latitude},${longitude},500`);
-        map.setAttribute("range", "1300");
+        map.setAttribute("range", compact ? "420" : "1300");
         map.setAttribute("tilt", "62");
         map.setAttribute("heading", "18");
         map.setAttribute("mode", "HYBRID");
@@ -80,15 +79,11 @@ export function SiteMap({ result }: { result: AssessmentResult }) {
     return () => { cancelled = true; };
   }, [latitude, longitude]);
 
-  const routeSummary = route?.routeAvailable
-    ? `${route.routeDistanceMiles?.toFixed(1)} route mi · ${route.travelMinutes ? `${Math.round(route.travelMinutes)} min drive` : "travel time returned"}`
-    : `${route?.straightLineMiles?.toFixed(1) ?? "—"} straight-line mi`;
-  return <section className="site-map-card" aria-label="3D site map">
+  return <section className={`site-map-card${compact ? " compact-map" : ""}`} aria-label="Site map">
     <div className="map-canvas">
       <div className="google-map-host" ref={host} />
       {state !== "ready3d" && state !== "ready2d" && <div className="map-fallback"><span>{state === "loading" ? "Preparing site map…" : state === "unavailable" ? "Google Maps key is not configured" : "Site map could not load"}</span><strong>{result.location.standardizedAddress ?? result.location.submittedAddress}</strong><small>{latitude?.toFixed(4)}, {longitude?.toFixed(4)}</small></div>}
     </div>
-    <div className="map-identity"><span>VERIFIED SITE</span><strong>{result.location.preciselyId ?? "Precisely ID unavailable"}</strong><small>Match {result.location.matchMetadata ?? "—"} · {routeSummary}</small></div>
-    <div className="map-layer-label">{state === "ready2d" ? "Satellite site view" : "3D satellite site view"}</div>
+    <div className="map-layer-label">{state === "ready2d" ? "Satellite" : "3D satellite"}</div>
   </section>;
 }

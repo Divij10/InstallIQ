@@ -1,108 +1,46 @@
 import type { AssessmentResult } from "@/lib/domain/assessment";
-import type { Evidence } from "@/lib/domain/evidence";
 import { AgentActivity } from "./agent-activity";
+import { AssessmentRail } from "./assessment-rail";
 import { DetailedSiteReport } from "./detailed-site-report";
-import { DigitalEvidenceCoverage } from "./digital-evidence-coverage";
-import { EvidenceExplanationPanels } from "./evidence-explanation-panels";
 import { RawEvidenceDrawer } from "./raw-evidence-drawer";
-import { SiteMap } from "./site-map";
-import { SiteStatsBento } from "./site-stats-bento";
-import { StatusBanner } from "./status-banner";
 
-const friendlyCapability: Record<string, string> = {
-  ADDRESS_VERIFY: "Address verification",
-  ADDRESS_GEOCODE: "Coordinate lookup",
-  TAX_JURISDICTION: "Tax jurisdiction",
-  AUTHORITY_HAVING_JURISDICTION: "AHJ / emergency context",
-  TIMEZONE: "Timezone",
-  PLACES_CONTEXT: "Nearby places",
-  PROPERTY_ATTRIBUTES: "Property structure",
-  BUILDING_INFORMATION: "Building information",
-  PARCEL_INFORMATION: "Parcel information",
-  ROOF_ATTRIBUTES: "Roof attributes",
-  ROUTE_OR_TRAVEL_TIME: "Route context",
-  CONTACT_NAME_PARSE: "Name check",
-  CONTACT_EMAIL_VERIFY: "Email check",
-  CONTACT_PHONE_VALIDATE: "Phone check"
-};
-
-function CapabilityCoverage({ evidence }: { evidence: Evidence[] }) {
-  const precisely = evidence.filter((item) => item.source.provider === "Precisely");
-  const confirmed = precisely.filter((item) => item.status === "success");
-  const unavailable = precisely.filter((item) => item.status === "unavailable");
-  const notRequested = precisely.filter((item) => item.status === "not_requested");
-  const attention = precisely.filter((item) => item.status === "error" || item.status === "not_found");
-  return (
-    <section className="coverage-card" aria-label="Precisely data coverage">
-      <div className="section-heading">
-        <div>
-          <div className="eyebrow">PRECISELY MCP COVERAGE</div>
-          <h3>What the connected catalog delivered</h3>
-        </div>
-        <span className="coverage-count">{confirmed.length} verified</span>
-      </div>
-      <dl className="coverage-metrics">
-        <div>
-          <dt>{confirmed.length}</dt>
-          <dd>returned facts</dd>
-        </div>
-        <div>
-          <dt>{unavailable.length}</dt>
-          <dd>not in this catalog</dd>
-        </div>
-        <div>
-          <dt>{attention.length}</dt>
-          <dd>needs attention</dd>
-        </div>
-      </dl>
-      <div className="capability-groups">
-        <div>
-          <b className="capability-label good">Returned</b>
-          <p>{confirmed.length ? confirmed.map((item) => friendlyCapability[item.source.capability] ?? item.source.capability).join(" · ") : "No live facts returned."}</p>
-        </div>
-        {unavailable.length > 0 && (
-          <div>
-            <b className="capability-label muted">Not connected</b>
-            <p>{unavailable.map((item) => friendlyCapability[item.source.capability] ?? item.source.capability).join(" · ")}</p>
-          </div>
-        )}
-        {notRequested.length > 0 && (
-          <div>
-            <b className="capability-label muted">Not requested</b>
-            <p>{notRequested.map((item) => friendlyCapability[item.source.capability] ?? item.source.capability).join(" · ")}</p>
-          </div>
-        )}
-        {attention.length > 0 && (
-          <div>
-            <b className="capability-label attention">Needs attention</b>
-            <p>{attention.map((item) => friendlyCapability[item.source.capability] ?? item.source.capability).join(" · ")}</p>
-          </div>
-        )}
-      </div>
-      <p className="coverage-note">InstallIQ asks the hosted MCP to find, describe, validate, and execute only site-relevant action contracts. It does not substitute missing property, permitting, or electrical data.</p>
-    </section>
-  );
+function squareFeet(value?: string) {
+  if (!value || value === "-1" || value === "-1.0") return "Not reported";
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? `${numeric.toLocaleString(undefined, { maximumFractionDigits: 0 })} sq ft` : value;
 }
 
-function DecisionBrief({ result }: { result: AssessmentResult }) {
-  return (
-    <section className="decision-brief">
-      <div className="decision-brief-main"><div><div className="eyebrow">ASSESSMENT BRIEF</div><h3>{result.brief.headline}</h3><p>{result.brief.summary}</p></div><aside className="brief-next" aria-label="Next step"><b>NEXT STEP</b><strong>{result.nextAction}</strong><small>{result.brief.source === "openai" ? "AI explanation grounded in normalized source evidence" : "Rules-based explanation grounded in normalized source evidence"}</small></aside></div>
-      <div className="brief-insights"><div><b>Verified signals</b><ul>{result.brief.siteSignals.map((signal) => <li key={signal}>{signal}</li>)}</ul></div><div><b>Limits on this assessment</b><ul>{result.brief.dataLimitations.map((limitation) => <li key={limitation}>{limitation}</li>)}</ul></div></div>
-    </section>
-  );
+function nearestStation(result: AssessmentResult) {
+  const distances = result.evInfrastructure?.stations.flatMap((station) => typeof station.distanceMiles === "number" ? [station.distanceMiles] : []) ?? [];
+  return distances.length ? `${Math.min(...distances).toFixed(1)} mi` : "Not reported";
 }
 
-function FieldSurvey({ gaps }: { gaps: string[] }) { const firstChecks = gaps.slice(0, 6); return <section className="survey-card"><div className="section-heading"><div><div className="eyebrow">FIELD SURVEY PLAN</div><h3>What people must still confirm</h3></div><span>Never inferred digitally</span></div><div className="survey-checks">{firstChecks.map((gap) => <div key={gap}><i>✓</i>{gap}</div>)}</div><details><summary>See all {gaps.length} field-survey checks</summary><ul>{gaps.slice(6).map((gap) => <li key={gap}>{gap}</li>)}</ul></details></section>; }
+function DecisionStrip({ result }: { result: AssessmentResult }) {
+  const service = result.serviceArea;
+  const metric = service?.routeAvailable ? `${service.routeDistanceMiles?.toFixed(1) ?? "—"} mi driving route` : `${service?.straightLineMiles?.toFixed(1) ?? "—"} mi straight-line fallback`;
+  return <section className="decision-strip" aria-label="Decision"><div><b>{service?.inside ? "Inside service area" : service?.inside === false ? "Outside service area" : "Service area not reported"}</b><i>·</i><b>{metric}</b><i>·</i><b>{result.status.replaceAll("_", " ")}</b></div><p>{service?.routeAvailable ? "Precisely returned a driving route, which InstallIQ used for its operating-area calculation." : "Precisely routing did not return a usable route, so InstallIQ used the visible straight-line fallback for its operating-area calculation."}</p></section>;
+}
 
-export function AssessmentDashboard({ result }: { result: AssessmentResult }) {
-  return <div className="results readable-results" aria-live="polite">
-    <StatusBanner result={result} />
-    <SiteMap result={result} />
-    <section className="assessment-summary" aria-label="Assessment summary"><SiteStatsBento result={result} /><DecisionBrief result={result} /><DigitalEvidenceCoverage result={result} /></section>
-    <EvidenceExplanationPanels result={result} />
-    <section className="site-dossier"><DetailedSiteReport result={result} /><FieldSurvey gaps={result.gaps} /></section>
-    {result.warnings.length > 0 && <section className="warnings"><b>Assessment notes</b>{result.warnings.map((warning) => <p key={warning}>{warning}</p>)}</section>}
-    <details className="technical-drawer"><summary>View Precisely MCP activity and source evidence</summary><p>Use this audit trail to see which actions the routing layer discovered, described, validated, and executed, then inspect the normalized source evidence.</p><CapabilityCoverage evidence={result.evidence} /><AgentActivity events={result.trace} /><RawEvidenceDrawer evidence={result.evidence} /></details>
+function KeyFacts({ result }: { result: AssessmentResult }) {
+  return <section className="key-facts" aria-label="Key facts"><div className="report-section-heading"><div className="eyebrow">KEY FACTS</div><h3>Key facts</h3></div><dl><div><dt>Building footprint</dt><dd>{squareFeet(result.property?.buildingArea)}</dd></div><div><dt>Parcel area</dt><dd>{squareFeet(result.property?.lotArea)}</dd></div><div><dt>Roof type</dt><dd>{result.property?.roofType ?? "Not reported"}</dd></div><div><dt>AHJ</dt><dd>{result.jurisdiction?.ahj ?? "Not reported"}</dd></div><div><dt>Nearest public charger</dt><dd>{nearestStation(result)}</dd></div></dl></section>;
+}
+
+function AssessmentLimits({ result }: { result: AssessmentResult }) {
+  const routeLimit = result.serviceArea?.routeAvailable ? "Route distance is an operating-area metric, not a finding about site access, construction, or electrical feasibility." : "Precisely routing was unavailable, so the operating-area result uses a straight-line distance fallback rather than drive time.";
+  const evLimit = result.evInfrastructure?.enabled && !result.evInfrastructure.unavailable ? "Nearby public stations are local context only; they do not establish site capacity, ownership, charger availability, or the need for new equipment." : "Public EV-station inventory was not returned for this run.";
+  return <section className="assessment-limits" id="assessment-limits" aria-label="Assessment limits"><div className="report-section-heading"><div className="eyebrow">ASSESSMENT LIMITS</div><h3>Assessment limits</h3></div><ul><li>{routeLimit}</li><li>{evLimit}</li><li>{result.gaps.slice(0, 4).join(", ")}, and the remaining field-survey checks require site access and engineering judgement.</li></ul></section>;
+}
+
+export function AssessmentDashboard({ result, onCheckAnother }: { result: AssessmentResult; onCheckAnother: () => void }) {
+  return <div className="assessment-layout" aria-live="polite">
+    <AssessmentRail result={result} onCheckAnother={onCheckAnother} />
+    <main className="assessment-content">
+      <DecisionStrip result={result} />
+      <KeyFacts result={result} />
+      <DetailedSiteReport result={result} />
+      <AssessmentLimits result={result} />
+      {result.warnings.length > 0 && <section className="assessment-notes"><div className="eyebrow">ASSESSMENT NOTES</div>{result.warnings.map((warning) => <p key={warning}>{warning}</p>)}</section>}
+      <details className="technical-drawer"><summary>Technical activity and source evidence</summary><p>Inspect the exact action flow and normalized source records.</p><AgentActivity events={result.trace} /><RawEvidenceDrawer evidence={result.evidence} /></details>
+    </main>
   </div>;
 }
