@@ -1,8 +1,27 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import type { AssessmentResult } from "@/lib/domain/assessment";
+import { Activity, ArrowRight, Building2, ClipboardList, Database, MapPinned, RotateCcw } from "lucide-react";
 import { AgentActivity } from "./agent-activity";
-import { AssessmentRail } from "./assessment-rail";
-import { DetailedSiteReport } from "./detailed-site-report";
+import { NearbyCharging, SiteRecord } from "./detailed-site-report";
 import { RawEvidenceDrawer } from "./raw-evidence-drawer";
+import { SiteMap } from "./site-map";
+import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
+
+type View = "overview" | "record" | "charging" | "activity";
+
+const views: Array<{ id: View; label: string; icon: typeof MapPinned }> = [
+  { id: "overview", label: "Overview", icon: MapPinned },
+  { id: "record", label: "Site record", icon: Building2 },
+  { id: "charging", label: "Public charging", icon: Database },
+  { id: "activity", label: "Source activity", icon: Activity },
+];
+
+function display(value?: string | number) {
+  return value === undefined || value === "" || value === "-1" || value === "-1.0" ? "Not reported" : String(value);
+}
 
 function squareFeet(value?: string) {
   if (!value || value === "-1" || value === "-1.0") return "Not reported";
@@ -12,35 +31,84 @@ function squareFeet(value?: string) {
 
 function nearestStation(result: AssessmentResult) {
   const distances = result.evInfrastructure?.stations.flatMap((station) => typeof station.distanceMiles === "number" ? [station.distanceMiles] : []) ?? [];
-  return distances.length ? `${Math.min(...distances).toFixed(1)} mi` : "Not reported";
+  return distances.length ? `${Math.min(...distances).toFixed(1)} mi away` : "Distance not reported";
 }
 
-function DecisionStrip({ result }: { result: AssessmentResult }) {
-  const service = result.serviceArea;
-  const metric = service?.routeAvailable ? `${service.routeDistanceMiles?.toFixed(1) ?? "—"} mi driving route` : `${service?.straightLineMiles?.toFixed(1) ?? "—"} mi straight-line fallback`;
-  return <section className="decision-strip" aria-label="Decision"><div><b>{service?.inside ? "Inside service area" : service?.inside === false ? "Outside service area" : "Service area not reported"}</b><i>·</i><b>{metric}</b><i>·</i><b>{result.status.replaceAll("_", " ")}</b></div><p>{service?.routeAvailable ? "Precisely returned a driving route, which InstallIQ used for its operating-area calculation." : "Precisely routing did not return a usable route, so InstallIQ used the visible straight-line fallback for its operating-area calculation."}</p></section>;
+function DecisionPanel({ result, onReviewPlan }: { result: AssessmentResult; onReviewPlan: () => void }) {
+  const area = result.serviceArea;
+  const distance = area?.routeAvailable ? area.routeDistanceMiles : area?.straightLineMiles;
+  const distanceLabel = area?.routeAvailable ? "Driving route" : "Straight-line fallback";
+  return <section className="report-decision" aria-label="Assessment decision">
+    <div className="report-decision-top">
+      <span className="report-kicker">Assessment decision</span>
+      <Badge className={`report-status ${result.status.toLowerCase()}`}>{result.status.replaceAll("_", " ")}</Badge>
+      <h2>{result.nextAction}</h2>
+      <p>{result.explanation}</p>
+    </div>
+    <div className="report-decision-facts">
+      <div><span>Operating area</span><strong>{area?.inside === undefined ? "Not established" : area.inside ? "Inside" : "Outside"}</strong></div>
+      <div><span>{distanceLabel}</span><strong>{distance === undefined ? "Not reported" : `${distance.toFixed(1)} mi`}</strong></div>
+      <div><span>Evidence coverage</span><strong>{result.evidenceScore.score}<small> / 100</small></strong></div>
+    </div>
+    <p className="report-decision-note">{area?.routeAvailable ? "Precisely returned a driving route for the operating-area check." : "Precisely did not return a usable route. The distance shown is a geographic fallback."} Coverage measures returned data, not site suitability.</p>
+    <Button variant="outline" className="report-decision-action" onClick={onReviewPlan}>Review next steps <ArrowRight size={15} /></Button>
+  </section>;
 }
 
-function KeyFacts({ result }: { result: AssessmentResult }) {
-  return <section className="key-facts" aria-label="Key facts"><div className="report-section-heading"><div className="eyebrow">KEY FACTS</div><h3>Key facts</h3></div><dl><div><dt>Building footprint</dt><dd>{squareFeet(result.property?.buildingArea)}</dd></div><div><dt>Parcel area</dt><dd>{squareFeet(result.property?.lotArea)}</dd></div><div><dt>Roof type</dt><dd>{result.property?.roofType ?? "Not reported"}</dd></div><div><dt>AHJ</dt><dd>{result.jurisdiction?.ahj ?? "Not reported"}</dd></div><div><dt>Nearest public charger</dt><dd>{nearestStation(result)}</dd></div></dl></section>;
+function FindingRow({ label, value, supporting, source }: { label: string; value: string; supporting: string; source: string }) {
+  return <div className="report-finding-row"><div className="report-finding-label">{label}</div><div className="report-finding-value"><strong>{value}</strong><span>{supporting}</span></div><span className="report-finding-source">{source}</span></div>;
 }
 
-function AssessmentLimits({ result }: { result: AssessmentResult }) {
-  const routeLimit = result.serviceArea?.routeAvailable ? "Route distance is an operating-area metric, not a finding about site access, construction, or electrical feasibility." : "Precisely routing was unavailable, so the operating-area result uses a straight-line distance fallback rather than drive time.";
-  const evLimit = result.evInfrastructure?.enabled && !result.evInfrastructure.unavailable ? "Nearby public stations are local context only; they do not establish site capacity, ownership, charger availability, or the need for new equipment." : "Public EV-station inventory was not returned for this run.";
-  return <section className="assessment-limits" id="assessment-limits" aria-label="Assessment limits"><div className="report-section-heading"><div className="eyebrow">ASSESSMENT LIMITS</div><h3>Assessment limits</h3></div><ul><li>{routeLimit}</li><li>{evLimit}</li><li>{result.gaps.slice(0, 4).join(", ")}, and the remaining field-survey checks require site access and engineering judgement.</li></ul></section>;
+function Findings({ result }: { result: AssessmentResult }) {
+  const stations = result.evInfrastructure;
+  return <section className="report-findings" aria-label="Digital findings">
+    <div className="report-section-title"><div><span className="report-kicker">01 / Digital findings</span><h2>Site findings</h2></div><p>Source facts gathered before a field visit.</p></div>
+    <div className="report-finding-table">
+      <FindingRow label="Site identity" value={display(result.location.preciselyId)} supporting={`Address match ${display(result.location.matchMetadata)}`} source="Precisely" />
+      <FindingRow label="Property" value={squareFeet(result.property?.buildingArea)} supporting={`Parcel area ${squareFeet(result.property?.lotArea)}`} source="Precisely" />
+      <FindingRow label="Local authority" value={display(result.jurisdiction?.ahj)} supporting={`Tax jurisdiction ${display(result.jurisdiction?.taxJurisdiction)}`} source="Precisely" />
+      <FindingRow label="Public charging" value={stations?.enabled && !stations.unavailable ? `${stations.stations.length} stations within ${stations.searchRadiusMiles} mi` : "Not available"} supporting={stations?.enabled && !stations.unavailable ? `Nearest listed station ${nearestStation(result)}` : "Public station lookup did not return data"} source="US AFDC" />
+    </div>
+  </section>;
+}
+
+function NextSteps({ result }: { result: AssessmentResult }) {
+  const needsSurvey = result.status === "FIELD_SURVEY_REQUIRED";
+  const handoffItems = needsSurvey ? result.gaps.slice(0, 6) : result.status === "ADDRESS_CORRECTION_REQUIRED" ? ["Confirm the street address and any unit number", "Run the digital assessment again after correction"] : result.status === "OUTSIDE_SERVICE_AREA" ? ["Review the request with an out-of-area sales contact", "Confirm whether a local installation partner is needed"] : ["Inspect the source evidence for errors or conflicts", "Resolve the missing information before dispatch"];
+  return <section className="report-next" id="report-next-steps" aria-label="Next steps">
+    <div className="report-section-title"><div><span className="report-kicker">02 / Human follow-up</span><h2>Next steps</h2></div></div>
+    <div className="report-next-grid">
+      <div className="report-next-intro"><ClipboardList size={19} /><h3>{result.nextAction}</h3><p>{needsSurvey ? result.brief.explanations.fieldSurvey : result.explanation}</p></div>
+      <div className="report-survey-list"><span>{needsSurvey ? "Checks to prepare" : "Handoff items"}</span><ul>{handoffItems.map((item, index) => <li key={item}><span>{String(index + 1).padStart(2, "0")}</span>{item}</li>)}</ul></div>
+    </div>
+  </section>;
+}
+
+function ActivityView({ result }: { result: AssessmentResult }) {
+  return <section className="report-activity" aria-label="Source activity"><div className="report-section-title"><div><span className="report-kicker">Evidence trail</span><h2>Source activity</h2></div><p>Actions, responses, and provenance for this run.</p></div><AgentActivity events={result.trace} /><RawEvidenceDrawer evidence={result.evidence} /></section>;
 }
 
 export function AssessmentDashboard({ result, onCheckAnother }: { result: AssessmentResult; onCheckAnother: () => void }) {
-  return <div className="assessment-layout" aria-live="polite">
-    <AssessmentRail result={result} onCheckAnother={onCheckAnother} />
-    <main className="assessment-content">
-      <DecisionStrip result={result} />
-      <KeyFacts result={result} />
-      <DetailedSiteReport result={result} />
-      <AssessmentLimits result={result} />
-      {result.warnings.length > 0 && <section className="assessment-notes"><div className="eyebrow">ASSESSMENT NOTES</div>{result.warnings.map((warning) => <p key={warning}>{warning}</p>)}</section>}
-      <details className="technical-drawer"><summary>Technical activity and source evidence</summary><p>Inspect the exact action flow and normalized source records.</p><AgentActivity events={result.trace} /><RawEvidenceDrawer evidence={result.evidence} /></details>
-    </main>
+  const [view, setView] = useState<View>("overview");
+  const [scrollToPlan, setScrollToPlan] = useState(false);
+  useEffect(() => {
+    if (view !== "overview" || !scrollToPlan) return;
+    document.getElementById("report-next-steps")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setScrollToPlan(false);
+  }, [view, scrollToPlan]);
+  const reviewPlan = () => {
+    setView("overview");
+    setScrollToPlan(true);
+  };
+  return <div className="report-workspace" aria-live="polite">
+    <header className="report-heading"><div><span className="report-kicker">Site assessment <span aria-hidden="true">/</span> {result.mode === "hosted" ? "Live data" : "Local data"}</span><h1>{result.location.standardizedAddress ?? result.location.submittedAddress}</h1><p>Digital pre-site intelligence for a commercial EV installation request</p></div><Button variant="outline" onClick={onCheckAnother}><RotateCcw size={15} /> New site</Button></header>
+    <div className="report-hero"><div className="report-map"><SiteMap result={result} /></div><DecisionPanel result={result} onReviewPlan={reviewPlan} /></div>
+    <nav className="report-tabs" role="tablist" aria-label="Assessment views">{views.map(({ id, label, icon: Icon }) => <Button key={id} variant="ghost" role="tab" aria-selected={view === id} aria-controls={`report-panel-${id}`} className={view === id ? "active" : undefined} onClick={() => setView(id)}><Icon size={15} />{label}</Button>)}</nav>
+    <div id={`report-panel-${view}`} role="tabpanel" className="report-panel">
+      {view === "overview" && <><Findings result={result} /><NextSteps result={result} />{result.warnings.length > 0 && <div className="report-notes"><strong>Data notes</strong><ul>{result.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></div>}</>}
+      {view === "record" && <SiteRecord result={result} />}
+      {view === "charging" && <NearbyCharging result={result} />}
+      {view === "activity" && <ActivityView result={result} />}
+    </div>
   </div>;
 }

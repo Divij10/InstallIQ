@@ -120,11 +120,11 @@ test("assessment results keep labels and values visually separated", async ({ pa
   await page.getByLabel("Installation address").fill("1317 S Terrace Rd, Tempe, AZ 85281");
   await page.getByRole("button", { name: "CHECK THIS SITE" }).click();
 
-  await expect(page.getByRole("heading", { name: "FIELD SURVEY REQUIRED" })).toBeVisible();
-  await expect(page.locator(".brief-next b")).toHaveText("NEXT STEP");
-  await expect(page.locator(".brief-next strong")).toHaveText("Schedule field survey");
-  await expect(page.locator(".brief-next small")).toContainText("Rules-based explanation");
-  await expect(page.getByRole("heading", { name: "How complete is this digital record?" })).toBeVisible();
-  await expect(page.locator(".coverage-metrics dt").first()).toHaveText("1");
-  await expect(page.locator(".coverage-metrics dd").first()).toHaveText("returned facts");
+  await expect(page.getByLabel("Assessment decision")).toContainText("FIELD SURVEY REQUIRED");
+  await expect(page.getByRole("heading", { name: "Schedule field survey" }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Site findings" })).toBeVisible();
+  await page.getByRole("tab", { name: "Site record" }).click();
+  await expect(page.getByLabel("Site record")).toContainText("Precisely ID");
+  await page.getByRole("tab", { name: "Source activity" }).click();
+  await expect(page.getByLabel("Source activity")).toContainText("ADDRESS_VERIFY");
 });
