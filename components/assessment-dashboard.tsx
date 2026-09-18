@@ -2,12 +2,11 @@
 
 import { useEffect, useState } from "react";
 import type { AssessmentResult } from "@/lib/domain/assessment";
-import { Activity, ArrowRight, Building2, Database, MapPinned, RotateCcw } from "lucide-react";
+import { Activity, Building2, Database, MapPinned, RotateCcw } from "lucide-react";
 import { AgentActivity } from "./agent-activity";
 import { NearbyCharging, SiteRecord } from "./detailed-site-report";
 import { RawEvidenceDrawer } from "./raw-evidence-drawer";
 import { SiteMap, type MapFocus } from "./site-map";
-import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 
 type View = "overview" | "record" | "charging" | "activity";
@@ -34,25 +33,6 @@ function nearestStation(result: AssessmentResult) {
   return distances.length ? `${Math.min(...distances).toFixed(1)} mi away` : "Distance not reported";
 }
 
-function DecisionPanel({ result, onReviewPlan }: { result: AssessmentResult; onReviewPlan: () => void }) {
-  const area = result.serviceArea;
-  const distance = area?.routeAvailable ? area.routeDistanceMiles : area?.straightLineMiles;
-  const distanceLabel = area?.routeAvailable ? "Driving route" : "Straight-line fallback";
-  return <section className="report-decision" aria-label="Assessment decision">
-    <div className="report-decision-top">
-      <Badge className={`report-status ${result.status.toLowerCase()}`}>{result.status.replaceAll("_", " ")}</Badge>
-      <h2>{result.nextAction}</h2>
-      <p>{result.explanation}</p>
-    </div>
-    <div className="report-decision-facts">
-      <div><span>Operating area</span><strong>{area?.inside === undefined ? "Not established" : area.inside ? "Inside" : "Outside"}</strong></div>
-      <div><span>{distanceLabel}</span><strong>{distance === undefined ? "Not reported" : `${distance.toFixed(1)} mi`}</strong></div>
-      <div><span>Evidence coverage</span><strong>{result.evidenceScore.score}<small> / 100</small></strong></div>
-    </div>
-    <p className="report-decision-note">{area?.routeAvailable ? "Precisely returned a driving route for the operating-area check." : "Precisely did not return a usable route. The distance shown is a geographic fallback."} Coverage measures returned data, not site suitability.</p>
-    <Button variant="outline" className="report-decision-action" onClick={onReviewPlan}>Review next steps <ArrowRight size={15} /></Button>
-  </section>;
-}
 
 function FindingRow({ label, value, supporting, source }: { label: string; value: string; supporting: string; source: string }) {
   return <div className="report-finding-row"><div className="report-finding-label">{label}</div><div className="report-finding-value"><strong>{value}</strong><span>{supporting}</span></div><span className="report-finding-source">{source}</span></div>;
@@ -90,27 +70,19 @@ function ActivityView({ result }: { result: AssessmentResult }) {
 export function AssessmentDashboard({ result, onCheckAnother }: { result: AssessmentResult; onCheckAnother: () => void }) {
   const [view, setView] = useState<View>("overview");
   const [mapFocus, setMapFocus] = useState<MapFocus>("site");
-  const [scrollToPlan, setScrollToPlan] = useState(false);
-  useEffect(() => {
-    if (view !== "overview" || !scrollToPlan) return;
-    document.getElementById("report-next-steps")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    setScrollToPlan(false);
-  }, [view, scrollToPlan]);
-  const reviewPlan = () => {
-    setView("overview");
-    setScrollToPlan(true);
-  };
   return <div className="report-workspace" aria-live="polite">
     <header className="report-heading"><div><h1>{result.businessName}</h1><p>{result.location.standardizedAddress ?? result.location.submittedAddress}</p></div><Button variant="outline" onClick={onCheckAnother}><RotateCcw size={15} /> New site</Button></header>
     <div className="report-verdict">
-      <div className="report-verdict-lead">
-        <span className={`report-verdict-dot ${result.status === "FIELD_SURVEY_REQUIRED" ? "go" : "nogo"}`} />
-        <strong className="report-verdict-label">{result.status === "FIELD_SURVEY_REQUIRED" ? "Suitable for field survey" : result.status === "OUTSIDE_SERVICE_AREA" ? "Outside service area" : result.status === "ADDRESS_CORRECTION_REQUIRED" ? "Address needs correction" : "Needs data review"}</strong>
+      <div className="report-verdict-text">
+        <div className="report-verdict-lead">
+          <span className={`report-verdict-dot ${result.status === "FIELD_SURVEY_REQUIRED" ? "go" : "nogo"}`} />
+          <strong className="report-verdict-label">{result.status === "FIELD_SURVEY_REQUIRED" ? "Suitable for field survey" : result.status === "OUTSIDE_SERVICE_AREA" ? "Outside service area" : result.status === "ADDRESS_CORRECTION_REQUIRED" ? "Address needs correction" : "Needs data review"}</strong>
+        </div>
+        <p className="report-verdict-summary">{result.brief.summary}</p>
       </div>
-      <p className="report-verdict-summary">{result.brief.summary}</p>
       {result.brief.siteSignals.length > 0 && <ul className="report-verdict-signals">{result.brief.siteSignals.map((signal) => <li key={signal}>{signal}</li>)}</ul>}
     </div>
-    <div className="report-hero"><div className="report-map"><SiteMap result={result} focus={mapFocus} onFocusChange={setMapFocus} /></div><DecisionPanel result={result} onReviewPlan={reviewPlan} /></div>
+    <div className="report-hero"><SiteMap result={result} focus={mapFocus} onFocusChange={setMapFocus} /></div>
     <nav className="report-tabs" role="tablist" aria-label="Assessment views">{views.map(({ id, label, icon: Icon }) => <Button key={id} variant="ghost" role="tab" aria-selected={view === id} aria-controls={`report-panel-${id}`} className={view === id ? "active" : undefined} onClick={() => { setView(id); if (id === "charging") setMapFocus("chargers"); }}><Icon size={15} />{label}</Button>)}</nav>
     <div id={`report-panel-${view}`} role="tabpanel" className="report-panel">
       {view === "overview" && <><Findings result={result} /><NextSteps result={result} />{result.warnings.length > 0 && <div className="report-notes"><strong>Data notes</strong><ul>{result.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></div>}</>}

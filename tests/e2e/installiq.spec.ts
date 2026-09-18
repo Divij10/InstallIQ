@@ -6,6 +6,8 @@ const assessment: AssessmentResult = {
   explanation: "The site identity was resolved and useful digital context was collected. Physical engineering and site facts still require a field survey.",
   nextAction: "Schedule field survey",
   businessName: "Test Business",
+  chargerType: "LEVEL_2",
+  chargerCount: 2,
   mode: "local",
   contact: {
     name: "Alex Johnson",
